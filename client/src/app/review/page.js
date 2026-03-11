@@ -1,5 +1,5 @@
 'use client';
-
+import ChatDrawer from './ChatDrawer';
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -155,6 +155,17 @@ export default function Review() {
 
     
       {review && <ReviewPanel review={review} />}
+
+      {review && (
+  <ChatDrawer
+    pr={pr}
+    files={files}
+    review={review}
+  />
+)}
+
+
+      
     </div>
   );
 }
