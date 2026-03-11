@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import axios from 'axios';
 import { ArrowLeft, GitPullRequest, Plus, Minus, FileCode, AlertCircle } from 'lucide-react';
+import ReviewPanel from './ReviewPanel';
 
 export default function Review() {
   const searchParams = useSearchParams();
@@ -12,6 +13,8 @@ export default function Review() {
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
   const [activeFile, setActiveFile] = useState(0);
+  const [review, setReview] = useState(null);
+  const [reviewing, setReviewing] = useState(false);
 
   useEffect(() => {
     const prUrl = searchParams.get('prUrl');
@@ -29,6 +32,20 @@ export default function Review() {
       setError(err.response?.data?.error || 'Failed to fetch PR.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function runReview() {
+    try {
+      setReviewing(true);
+      const res = await axios.post('http://localhost:3001/api/review/analyze', {
+        files: data.files
+      });
+      setReview(res.data.review);
+    } catch (err) {
+      console.error('Review failed:', err);
+    } finally {
+      setReviewing(false);
     }
   }
 
@@ -53,9 +70,9 @@ export default function Review() {
   const file = files[activeFile];
 
   return (
-    <div style={s.page}>
+    <div style={{ ...s.page, gridTemplateColumns: review ? '300px 1fr 380px' : '300px 1fr' }}>
 
-      {/* Sidebar */}
+      
       <aside style={s.sidebar}>
         <div style={s.sidebarHeader}>
           <button style={s.backBtn} onClick={() => router.push('/')}>
@@ -98,7 +115,7 @@ export default function Review() {
         </div>
       </aside>
 
-      {/* Main */}
+    
       <main style={s.main}>
         <div style={s.diffHeader}>
           <span style={s.diffFilename}>{file.filename}</span>
@@ -120,13 +137,24 @@ export default function Review() {
 
         <div style={s.reviewBar}>
           <span style={{ color: '#8b949e', fontSize: '0.78rem' }}>
-            🤖 AI review engine coming in the next step
+            {review ? '✅ Review complete' : '🤖 Ready to analyze this PR'}
           </span>
-          <button style={s.reviewBtnDisabled} disabled>
-            Run AI Review (coming soon)
+          <button
+            style={{
+              ...s.reviewBtn,
+              opacity: reviewing ? 0.6 : 1,
+              cursor: reviewing ? 'not-allowed' : 'pointer'
+            }}
+            onClick={runReview}
+            disabled={reviewing}
+          >
+            {reviewing ? '⏳ Analyzing...' : '▶ Run AI Review'}
           </button>
         </div>
       </main>
+
+    
+      {review && <ReviewPanel review={review} />}
     </div>
   );
 }
@@ -182,12 +210,12 @@ function diffTextColor(type) {
 }
 
 const s = {
-  page:            { display: 'flex', height: '100vh', overflow: 'hidden', background: '#080a0e' },
+  page:            { display: 'grid', height: '100vh', overflow: 'hidden', background: '#080a0e' },
   fullscreen:      { height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', background: '#080a0e' },
   spinner:         { width: '40px', height: '40px', border: '3px solid #2a3548', borderTopColor: '#f78166', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
   loadingText:     { fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 700 },
   errorText:       { fontSize: '0.9rem', color: '#8b949e', maxWidth: '360px', textAlign: 'center', lineHeight: 1.6 },
-  sidebar:         { width: '300px', minWidth: '300px', background: '#0d1117', borderRight: '1px solid #2a3548', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  sidebar:         { background: '#0d1117', borderRight: '1px solid #2a3548', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   sidebarHeader:   { padding: '1rem', borderBottom: '1px solid #2a3548', display: 'flex', flexDirection: 'column', gap: '0.6rem' },
   backBtn:         { display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: '1px solid #2a3548', color: '#8b949e', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', padding: '0.35rem 0.7rem', borderRadius: '4px', cursor: 'pointer', width: 'fit-content' },
   prBadge:         { display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem' },
@@ -208,7 +236,7 @@ const s = {
   fileChanges:     { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', flexShrink: 0 },
   addBadge:        { fontSize: '0.65rem', padding: '1px 5px', borderRadius: '3px', fontWeight: 700, color: '#3fb950', background: 'rgba(63,185,80,0.12)' },
   delBadge:        { fontSize: '0.65rem', padding: '1px 5px', borderRadius: '3px', fontWeight: 700, color: '#f85149', background: 'rgba(248,81,73,0.12)' },
-  main:            { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  main:            { display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   diffHeader:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.25rem', background: '#161b22', borderBottom: '1px solid #2a3548' },
   diffFilename:    { fontFamily: 'var(--font-mono)', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   diffBody:        { flex: 1, overflowY: 'auto', background: '#0d1117' },
@@ -216,5 +244,5 @@ const s = {
   lineNum:         { color: '#484f58', fontSize: '0.7rem', userSelect: 'none' },
   noPatch:         { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', height: '200px', color: '#484f58' },
   reviewBar:       { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.25rem', background: '#161b22', borderTop: '1px solid #2a3548' },
-  reviewBtnDisabled: { background: '#f78166', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontFamily: 'var(--font-display)', fontSize: '0.85rem', fontWeight: 700, opacity: 0.4, cursor: 'not-allowed' },
+  reviewBtn:       { background: '#f78166', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontFamily: 'var(--font-display)', fontSize: '0.85rem', fontWeight: 700, transition: 'all 0.2s' },
 };
