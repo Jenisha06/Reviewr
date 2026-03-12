@@ -15,7 +15,7 @@ export default function Review() {
   const [activeFile, setActiveFile] = useState(0);
   const [review, setReview] = useState(null);
   const [reviewing, setReviewing] = useState(false);
-
+const [showCelebration, setShowCelebration] = useState(false);
   useEffect(() => {
     const prUrl = searchParams.get('prUrl');
     const token = searchParams.get('token');
@@ -35,26 +35,40 @@ export default function Review() {
     }
   }
 
-  async function runReview() {
-    try {
-      setReviewing(true);
-      const res = await axios.post('http://localhost:3001/api/review/analyze', {
-        files: data.files
-      });
-      setReview(res.data.review);
-    } catch (err) {
-      console.error('Review failed:', err);
-    } finally {
-      setReviewing(false);
-    }
+async function runReview() {
+  try {
+    setReviewing(true);
+    const res = await axios.post('http://localhost:3001/api/review/analyze', {
+      files: data.files
+    });
+    setReview(res.data.review);
+    setShowCelebration(true);
+    setTimeout(() => setShowCelebration(false), 3000);
+  } catch (err) {
+    console.error('Review failed:', err);
+  } finally {
+    setReviewing(false);
   }
-
-  if (loading) return (
-    <div style={s.fullscreen}>
+}
+if (loading) return (
+  <div style={s.fullscreen}>
+    <div style={s.loadingCard}>
       <div style={s.spinner} />
       <p style={s.loadingText}>Fetching PR from GitHub...</p>
+      <div style={s.loadingSteps}>
+        {[
+          '🔗 Connecting to GitHub API',
+          '📂 Fetching changed files',
+          '🔍 Parsing diff data',
+        ].map((step, i) => (
+          <div key={i} style={{ ...s.loadingStep, animationDelay: `${i * 0.4}s` }}>
+            {step}
+          </div>
+        ))}
+      </div>
     </div>
-  );
+  </div>
+);
 
   if (error) return (
     <div style={s.fullscreen}>
@@ -71,7 +85,11 @@ export default function Review() {
 
   return (
     <div style={{ ...s.page, gridTemplateColumns: review ? '300px 1fr 380px' : '300px 1fr' }}>
-
+{showCelebration && (
+  <div style={s.celebration}>
+    🎉 Review complete! Found {Object.values(review || {}).flat().length} issues across 4 passes.
+  </div>
+)}
       
       <aside style={s.sidebar}>
         <div style={s.sidebarHeader}>
@@ -135,22 +153,46 @@ export default function Review() {
           }
         </div>
 
-        <div style={s.reviewBar}>
-          <span style={{ color: '#8b949e', fontSize: '0.78rem' }}>
-            {review ? '✅ Review complete' : '🤖 Ready to analyze this PR'}
-          </span>
-          <button
+      <div style={s.reviewBar}>
+  {reviewing ? (
+    <div style={s.analyzingRow}>
+      <div style={s.miniSpinner} />
+      <div style={s.analyzingSteps}>
+        {[
+          'Scanning for bugs...',
+          'Checking security...',
+          'Analyzing performance...',
+          'Reviewing style...',
+        ].map((step, i) => (
+          <span
+            key={i}
             style={{
-              ...s.reviewBtn,
-              opacity: reviewing ? 0.6 : 1,
-              cursor: reviewing ? 'not-allowed' : 'pointer'
+              ...s.analyzingStep,
+              animationDelay: `${i * 1.5}s`,
             }}
-            onClick={runReview}
-            disabled={reviewing}
           >
-            {reviewing ? '⏳ Analyzing...' : '▶ Run AI Review'}
-          </button>
-        </div>
+            {step}
+          </span>
+        ))}
+      </div>
+    </div>
+  ) : (
+    <span style={{ color: '#8b949e', fontSize: '0.78rem' }}>
+      {review ? '✅ Review complete' : '🤖 Ready to analyze this PR'}
+    </span>
+  )}
+  <button
+    style={{
+      ...s.reviewBtn,
+      opacity: reviewing ? 0.6 : 1,
+      cursor: reviewing ? 'not-allowed' : 'pointer'
+    }}
+    onClick={runReview}
+    disabled={reviewing}
+  >
+    {reviewing ? '⏳ Analyzing...' : '▶ Run AI Review'}
+  </button>
+</div>
       </main>
 
     
@@ -256,4 +298,12 @@ const s = {
   noPatch:         { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', height: '200px', color: '#484f58' },
   reviewBar:       { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.25rem', background: '#161b22', borderTop: '1px solid #2a3548' },
   reviewBtn:       { background: '#f78166', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontFamily: 'var(--font-display)', fontSize: '0.85rem', fontWeight: 700, transition: 'all 0.2s' },
+  loadingCard:   { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', background: '#0d1117', border: '1px solid #2a3548', borderRadius: '12px', padding: '2.5rem 3rem' },
+loadingSteps:  { display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' },
+loadingStep:   { fontSize: '0.78rem', color: '#484f58', animation: 'fadeUp 0.5s ease both' },
+analyzingRow:   { display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 },
+miniSpinner:    { width: '16px', height: '16px', border: '2px solid #2a3548', borderTopColor: '#f78166', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 },
+analyzingSteps: { display: 'flex', gap: '0.75rem', flexWrap: 'wrap' },
+analyzingStep:  { fontSize: '0.72rem', color: '#484f58', animation: 'fadeIn 0.5s ease both' },
+celebration: { position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)', background: '#3fb950', color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', padding: '0.75rem 1.5rem', borderRadius: '100px', zIndex: 200, animation: 'fadeUp 0.3s ease both', boxShadow: '0 4px 20px rgba(63,185,80,0.4)', whiteSpace: 'nowrap' },
 };
